@@ -1,6 +1,8 @@
 const jsonLatestVersionApp = require("./resources/latest.json");
 const axios = require("axios");
 const pfs = require("pfs");
+const cp = require("child_process");
+const path = require("path");
 
 const setupFeedURL = async url => {
   // http://206.189.37.133/self-update/latest.json
@@ -31,25 +33,6 @@ function compareIsNewerVersion(oldVer, newVer) {
   return false;
 }
 
-async function doCheckUpdate() {
-  const appUrl = "http://206.189.37.133/self-update";
-  const jsonLatestVersionServer = await setupFeedURL(appUrl);
-  const isNewVersion = isNewVersionAvalible(
-    jsonLatestVersionApp,
-    jsonLatestVersionServer
-  );
-  if (isNewVersion) {
-    const fullAppName = generateFullAppName(jsonLatestVersionServer);
-    const downloadLink = `${appUrl}/${fullAppName}`;
-    const tempPath = getTempPath();
-    const isDownloadFinish = await doDownloadFileFromServer(
-      fullAppName,
-      downloadLink,
-      tempPath
-    );
-    console.log(isDownloadFinish);
-  }
-}
 function getTempPath() {
   return `./temp`;
 }
@@ -61,13 +44,14 @@ async function doDownloadFileFromServer(fullAppName, downloadLink, tempPath) {
       responseType: "stream"
     })
       .then(result => {
-        const readStream = pfs.createWriteStream(`${tempPath}/${fullAppName}`);
+        const fullPath = `${tempPath}/${fullAppName}`;
+        const readStream = pfs.createWriteStream(fullPath);
         result.data.pipe(readStream);
         result.data.on("close", () => {
-          resolve(true);
+          resolve(fullPath);
         });
       })
-      .catch(error => reject(false));
+      .catch(error => reject(null));
   });
 }
 function generateFullAppName(jsonServer) {
@@ -85,4 +69,60 @@ function isNewVersionAvalible(jsonApp, jsonServer) {
   return false;
 }
 
+function doInstall(downloadedFile) {
+  const execute = cp.spawn(downloadedFile, [
+    "/verysilent",
+    "/nocloseapplications"
+  ]);
+  execute.stdout.on("data", data => {
+    console.log(`stdout: ${data}`);
+  });
+  execute.on("error", error => {
+    console.log(`error: ${error}`);
+  });
+  execute.on("close", code => {
+    console.log(`child process exited with code ${code}`);
+  });
+}
+
+function doUpdateJsonFile(jsonServer) {
+  pfs.unlinkSync("./resources/latest.json");
+  pfs.writeFile(
+    "./resources/latest.json",
+    JSON.stringify(jsonServer),
+    { flag: "wx" },
+    err => {
+      if (err) {
+        console.log("An error occured while writing JSON Object to File.");
+        return console.log(err);
+      }
+
+      console.log("JSON file has been saved.");
+    }
+  );
+}
+
+async function doCheckUpdate() {
+  const appUrl = "http://206.189.37.133/self-update";
+  const jsonLatestVersionServer = await setupFeedURL(appUrl);
+  const isNewVersion = isNewVersionAvalible(
+    jsonLatestVersionApp,
+    jsonLatestVersionServer
+  );
+  if (isNewVersion) {
+    const fullAppName = generateFullAppName(jsonLatestVersionServer);
+    const downloadLink = `${appUrl}/${fullAppName}`;
+    const tempPath = getTempPath();
+    const downloadedFile = await doDownloadFileFromServer(
+      fullAppName,
+      downloadLink,
+      tempPath
+    );
+    const downloadedFile = path.join(__dirname, "/temp/test-app-x64-1.0.1.exe");
+    if (downloadedFile) {
+      doInstall(downloadedFile);
+      doUpdateJsonFile(jsonLatestVersionServer);
+    }
+  }
+}
 doCheckUpdate();
