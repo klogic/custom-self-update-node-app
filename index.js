@@ -118,11 +118,15 @@ async function doCheckUpdate() {
       downloadLink,
       tempPath
     );
-    const downloadedFile = path.join(__dirname, "/temp/test-app-x64-1.0.1.exe");
+    // const downloadedFile = path.join(__dirname, "/temp/test-app-x64-1.0.1.exe");
     if (downloadedFile) {
       doInstall(downloadedFile);
       doUpdateJsonFile(jsonLatestVersionServer);
     }
+  } else {
+    console.log(
+      `this version ${jsonLatestVersionApp.version} is latest version`
+    );
   }
 }
 doCheckUpdate();
