@@ -1,0 +1,10 @@
+{
+  "name": "custom-self-update",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "pfs": "^3.0.0"
+  }
+}
